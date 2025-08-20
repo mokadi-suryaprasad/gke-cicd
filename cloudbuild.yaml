@@ -23,17 +23,22 @@ steps:
       echo "Running tests (placeholder)"
 
 # =========================
-# 3. Run CodeQL Analysis
+# CodeQL Analysis
 # =========================
-- name: 'github/codeql-action/init'
-  id: 'CodeQL Init'
+- name: 'ghcr.io/github/codeql-cli/codeql:latest'
+  id: 'CodeQL Scan'
   entrypoint: 'bash'
   args:
     - -c
     - |
-      echo "Running CodeQL init (placeholder)"
-      # Normally CodeQL runs in GitHub Actions, for GCP you may need
-      # to containerize or call GitHub CodeQL CLI here.
+      mkdir -p /workspace/codeql-db
+      codeql database create /workspace/codeql-db \
+        --language=python \
+        --source-root=app1
+      codeql database analyze /workspace/codeql-db \
+        --format=sarif-latest \
+        --output=/workspace/codeql-report.sarif
+
 
 # =========================
 # 4. Store Build Files into GCS
