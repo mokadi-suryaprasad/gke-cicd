@@ -1,37 +1,112 @@
 steps:
+# =========================
+# 1. Install Dependencies
+# =========================
+- name: 'python:3.11'
+  id: 'Install Dependencies'
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      pip install --upgrade pip
+      pip install -r app1/requirements.txt
+
+# =========================
+# 2. Run Tests
+# =========================
+- name: 'python:3.11'
+  id: 'Run Tests'
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      echo "Running tests (placeholder)"
+
+# =========================
+# 3. Run CodeQL Analysis
+# =========================
+- name: 'github/codeql-action/init'
+  id: 'CodeQL Init'
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      echo "Running CodeQL init (placeholder)"
+      # Normally CodeQL runs in GitHub Actions, for GCP you may need
+      # to containerize or call GitHub CodeQL CLI here.
+
+# =========================
+# 4. Store Build Files into GCS
+# =========================
+- name: 'gcr.io/cloud-builders/gsutil'
+  id: 'Upload Build Files to GCS'
+  args:
+    - cp
+    - app1/*
+    - gs://pythonapp1/
+
+# =========================
+# 5. Docker Build
+# =========================
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'us-central1-docker.pkg.dev/<your_project_id>/gke-repo/quickstart-image', './app1' ]
   id: 'Build Docker Image'
+  args: [
+    'build',
+    '-t', 'us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}',
+    './app1'
+  ]
 
-  # images:
-  # - 'us-central1-docker.pkg.dev/<your_project_id>/gke-repo/quickstart-image'
-
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'us-central1-docker.pkg.dev/<your_project_id>/gke-repo/quickstart-image' ]
-  id: 'Push Docker Image'
-
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'us-central1-docker.pkg.dev/<your_project_id>/gke-repo/flask-image', './app2' ]
-  id: 'Build Docker Image2'
-
-  # images:
-  # - 'us-central1-docker.pkg.dev/<your_project_id>/gke-repo/quickstart-image'
-
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'us-central1-docker.pkg.dev/<your_project_id>/gke-repo/flask-image' ]
-  id: 'Push Docker Image2'
-
-
-- name: 'google/cloud-sdk:latest'
+# =========================
+# 6. Trivy Image Scan
+# =========================
+- name: 'aquasec/trivy'
+  id: 'Trivy Scan'
   entrypoint: 'sh'
   args:
-  - -xe
-  - -c
-  - |
-    gcloud deploy apply --file deploy/pipeline.yaml --region=us-central1
-    gcloud deploy apply --file deploy/dev.yaml --region=us-central1
-    gcloud deploy releases create 'app-release-${SHORT_SHA}' --delivery-pipeline=gke-cicd-pipeline --region=us-central1 --skaffold-file=skaffold.yaml
+    - -c
+    - |
+      trivy image --exit-code 0 --severity HIGH,CRITICAL us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}
 
+# =========================
+# 7. Push Docker Image
+# =========================
+- name: 'gcr.io/cloud-builders/docker'
+  id: 'Push Docker Image'
+  args: [
+    'push',
+    'us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}'
+  ]
 
+# =========================
+# 8. DAST Scan on Running Container
+# =========================
+- name: 'owasp/zap2docker-stable'
+  id: 'OWASP ZAP DAST Scan'
+  entrypoint: 'sh'
+  args:
+    - -c
+    - |
+      docker run -d -p 8080:8080 us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}
+      zap-cli quick-scan --self-contained --start-options "-config api.disablekey=true" http://localhost:8080
+
+# =========================
+# 9. Update Kubernetes Manifests
+# =========================
+- name: 'google/cloud-sdk:latest'
+  id: 'Update Kubernetes Manifest'
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      sed -i "s|image: .*|image: us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}|" kubernetes/app1.yaml
+      cat kubernetes/app1.yaml
+      # Optionally push back to repo (if GitOps flow is required)
+
+# =========================
+# Options
+# =========================
 options:
   logging: CLOUD_LOGGING_ONLY
+
+images:
+- 'us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}'
