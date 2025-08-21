@@ -1,7 +1,5 @@
 steps:
-# =========================
 # 1. Install Dependencies
-# =========================
 - id: install-deps
   name: 'python:3.11'
   entrypoint: 'bash'
@@ -11,9 +9,7 @@ steps:
       pip install --upgrade pip
       pip install -r app1/requirements.txt
 
-# =========================
 # 2. Run Tests
-# =========================
 - id: run-tests
   name: 'python:3.11'
   entrypoint: 'bash'
@@ -23,9 +19,7 @@ steps:
       echo "Running tests (placeholder)"
       # pytest app1/tests || exit 1
 
-# =========================
 # 3. Store Build Files into GCS
-# =========================
 - id: upload-artifacts
   name: 'gcr.io/cloud-builders/gsutil'
   args:
@@ -33,9 +27,7 @@ steps:
     - app1/*
     - gs://pythonapp1/
 
-# =========================
 # 4. Docker Build
-# =========================
 - id: docker-build
   name: 'gcr.io/cloud-builders/docker'
   args: [
@@ -44,9 +36,7 @@ steps:
     './app1'
   ]
 
-# =========================
 # 5. Trivy Image Scan
-# =========================
 - id: trivy-scan
   name: 'aquasec/trivy:latest'
   entrypoint: 'sh'
@@ -55,9 +45,7 @@ steps:
     - |
       trivy image --exit-code 0 --severity HIGH,CRITICAL us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}
 
-# =========================
 # 6. Push Docker Image
-# =========================
 - id: docker-push
   name: 'gcr.io/cloud-builders/docker'
   args: [
@@ -65,25 +53,16 @@ steps:
     'us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}'
   ]
 
-# =========================
-# 10. Commit and Push Updated Manifests (GitOps)
-# =========================
-- id: commit-updated-manifest
-  name: 'gcr.io/cloud-builders/git'
+# 7. Update Kubernetes Manifest (locally, no push to CSR)
+- id: update-k8s-manifest
+  name: 'google/cloud-sdk:latest'
   entrypoint: 'bash'
   args:
     - -c
     - |
-      git config --global user.email "mspr9773@gmail.com"
-      git config --global user.name "M Surya Prasad"
-      git add kubernetes/deployment.yaml
-      git commit -m "Update image to ${SHORT_SHA}"
-      git push https://source.developers.google.com/p/$PROJECT_ID/r/$REPO_NAME HEAD:main
+      sed -i "s|\(image: \).*|\\1us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}|" kubernetes/deployment.yaml
+      cat kubernetes/deployment.yaml
 
-
-# =========================
-# Options
-# =========================
 options:
   logging: CLOUD_LOGGING_ONLY
 
