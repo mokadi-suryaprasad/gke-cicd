@@ -2,8 +2,8 @@ steps:
 # =========================
 # 1. Install Dependencies
 # =========================
-- name: 'python:3.11'
-  id: 'Install Dependencies'
+- id: install-deps
+  name: 'python:3.11'
   entrypoint: 'bash'
   args:
     - -c
@@ -14,29 +14,30 @@ steps:
 # =========================
 # 2. Run Tests
 # =========================
-- name: 'python:3.11'
-  id: 'Run Tests'
+- id: run-tests
+  name: 'python:3.11'
   entrypoint: 'bash'
   args:
     - -c
     - |
       echo "Running tests (placeholder)"
+      # pytest app1/tests || exit 1
 
 # =========================
-# 4. Store Build Files into GCS
+# 3. Store Build Files into GCS
 # =========================
-- name: 'gcr.io/cloud-builders/gsutil'
-  id: 'Upload Build Files to GCS'
+- id: upload-artifacts
+  name: 'gcr.io/cloud-builders/gsutil'
   args:
     - cp
     - app1/*
     - gs://pythonapp1/
 
 # =========================
-# 5. Docker Build
+# 4. Docker Build
 # =========================
-- name: 'gcr.io/cloud-builders/docker'
-  id: 'Build Docker Image'
+- id: docker-build
+  name: 'gcr.io/cloud-builders/docker'
   args: [
     'build',
     '-t', 'us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}',
@@ -44,10 +45,10 @@ steps:
   ]
 
 # =========================
-# 6. Trivy Image Scan
+# 5. Trivy Image Scan
 # =========================
-- name: 'aquasec/trivy'
-  id: 'Trivy Scan'
+- id: trivy-scan
+  name: 'aquasec/trivy:latest'
   entrypoint: 'sh'
   args:
     - -c
@@ -55,26 +56,27 @@ steps:
       trivy image --exit-code 0 --severity HIGH,CRITICAL us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}
 
 # =========================
-# 7. Push Docker Image
+# 6. Push Docker Image
 # =========================
-- name: 'gcr.io/cloud-builders/docker'
-  id: 'Push Docker Image'
+- id: docker-push
+  name: 'gcr.io/cloud-builders/docker'
   args: [
     'push',
     'us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}'
   ]
 
 # =========================
-# 9. Update Kubernetes Manifests
+# 7. Update Kubernetes Deployment
 # =========================
-- name: 'Update Kubernetes Manifest'
-  id: 'Update Kubernetes Manifest'
+- id: update-manifest
+  name: 'google/cloud-sdk:latest'
   entrypoint: 'bash'
   args:
     - -c
     - |
-      sed -i "s|\( *image: \).*|\1us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}|" kubernetes/app1.yaml
-      cat kubernetes/app1.yaml
+      sed -i "s|\( *image: \).*|\1us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}|" kubernetes/deployment.yaml
+      echo "✅ Updated Kubernetes manifest:"
+      cat kubernetes/deployment.yaml
 
 # =========================
 # Options
