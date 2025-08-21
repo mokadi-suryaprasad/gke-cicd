@@ -1,136 +1,70 @@
 steps:
-# ============================
 # 1. Checkout Code
-# ============================
 - name: 'gcr.io/cloud-builders/git'
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      git clone https://github.com/$REPO_NAME.git .
-      git checkout $BRANCH_NAME
+  args: ['clone', 'https://github.com/$REPO_NAME.git']
+  id: 'Checkout Code'
 
-# ============================
-# 2. Install Dependencies
-# ============================
+# 2. Setup Python & Install Dependencies
 - name: 'python:3.11'
-  entrypoint: bash
+  entrypoint: 'bash'
   args:
     - -c
     - |
-      pip install --upgrade pip
+      python -m pip install --upgrade pip
       pip install -r requirements.txt
 
-# ============================
 # 3. Run Tests
-# ============================
 - name: 'python:3.11'
-  entrypoint: bash
+  entrypoint: 'bash'
   args:
     - -c
     - |
       echo " No test cases running "
-
-# ============================
-# 4. CodeQL Scan (placeholder)
-# ============================
-- name: 'gcr.io/cloud-builders/curl'
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      echo "Running CodeQL scan (placeholder). Integrate GH CodeQL here if needed."
-
-# ============================
-# 5. Build Python Wheel & Copy to GCS
-# ============================
-- name: 'python:3.11'
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      python setup.py bdist_wheel
-      gsutil cp dist/*.whl gs://$PROJECT_ID-artifacts/python/
-
-# ============================
-# 6. Build Docker Image
-# ============================
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-    [
-      'build', '-t',
-      'us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}', '.'
-    ]
-
-# ============================
-# 7. Trivy Image Scan
-# ============================
-- name: 'aquasec/trivy'
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      trivy image --exit-code 0 --severity HIGH,CRITICAL \
-        --format json \
-        -o trivy-report.json \
-        us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}
-      gsutil cp trivy-report.json gs://$PROJECT_ID-artifacts/reports/
-
-# ============================
-# 8. Push Docker Image
-# ============================
-- name: 'gcr.io/cloud-builders/docker'
-  args:
-    [
-      'push',
-      'us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}'
-    ]
-
-# ============================
-# 9. DAST Scan (OWASP ZAP)
-# ============================
-- name: 'owasp/zap2docker-stable'
-  entrypoint: bash
-  args:
-    - -c
-    - |
-      echo "Running OWASP ZAP Scan..."
-      zap-baseline.py -t http://my-service.default.svc.cluster.local:8080 \
-        -r zap-report.html || true
-      gsutil cp zap-report.html gs://$PROJECT_ID-artifacts/reports/
-
-# ============================
-# 10. Update Kubernetes Deployment Manifest
-# ============================
+# 4. CodeQL Scan
 - name: 'gcr.io/cloud-builders/git'
-  entrypoint: bash
+  entrypoint: 'bash'
   args:
     - -c
     - |
-      git config --global user.email "cloudbuild@$PROJECT_ID.iam.gserviceaccount.com"
+      echo "Running CodeQL analysis..."
+      # Your CodeQL steps here
+
+# 5. Store artifacts in GCS
+- name: 'gcr.io/cloud-builders/gsutil'
+  args: ['cp', '*.whl', 'gs://pythonapp1/artifacts/']
+
+# 6. Docker Build
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/pythonapp1:$SHORT_SHA', '.']
+
+# 7. Trivy Scan
+- name: 'aquasec/trivy:latest'
+  entrypoint: 'trivy'
+  args: ['image', 'us-central1-docker.pkg.dev/$PROJECT_ID/pythonapp1:$SHORT_SHA']
+
+# 8. Push Docker Image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/pythonapp1:$SHORT_SHA']
+
+# 9. OWASP ZAP DAST
+- name: 'owasp/zap2docker-stable'
+  entrypoint: 'zap-baseline.py'
+  args: ['-t', 'http://pythonapp1-service:8080']
+
+# 10. Update Deployment YAML in GitHub
+- name: 'gcr.io/cloud-builders/git'
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      sed -i "s|image: .*|image: us-central1-docker.pkg.dev/$PROJECT_ID/pythonapp1:$SHORT_SHA|" kubernetes/deployment.yaml
+      git config --global user.email "cloudbuild@example.com"
       git config --global user.name "Cloud Build"
-      sed -i "s|image: .*|image: us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}|" kubernetes/deployment.yaml
       git add kubernetes/deployment.yaml
-      git commit -m "Update image to ${SHORT_SHA}" || echo "No changes to commit"
-      git push https://source.developers.google.com/p/$PROJECT_ID/r/gke-cicd HEAD:main
+      git commit -m "Update image to $SHORT_SHA"
+      git push https://github.com/$REPO_NAME.git HEAD:main
 
-# ============================
-# Substitutions
-# ============================
-substitutions:
-  _SERVICE_NAME: pythonapp1
-  _REGION: us-central1
-
-# ============================
-# Artifact Registry Images
-# ============================
-images:
-  - "us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}"
-
-# ============================
-# Build Artifacts to GCS
-# ============================
-artifacts:
-  objects:
-    location: gs://$PROJECT_ID-artifacts/builds/
-    paths: ["dist/*.whl"]
+# Options block (FIXED)
+options:
+  logging: GCS_ONLY
+  logBucket: gs://pythonapp1
