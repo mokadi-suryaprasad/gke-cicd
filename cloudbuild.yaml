@@ -87,4 +87,4 @@ images:
   - "us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}"
 
 substitutions:
-  _GITHUB_TOKEN: "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"
+  _GITHUB_TOKEN: ""
