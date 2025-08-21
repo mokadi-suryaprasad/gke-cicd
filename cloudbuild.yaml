@@ -67,15 +67,14 @@ steps:
 # =========================
 # 9. Update Kubernetes Manifests
 # =========================
-- name: 'google/cloud-sdk:latest'
+- name: 'Update Kubernetes Manifest'
   id: 'Update Kubernetes Manifest'
   entrypoint: 'bash'
   args:
     - -c
     - |
-      sed -i "s|image: .*|image: us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}|" kubernetes/app1.yaml
+      sed -i "s|\( *image: \).*|\1us-central1-docker.pkg.dev/gcp-zero-to-hero-467513/app1/pythonapp1:${SHORT_SHA}|" kubernetes/app1.yaml
       cat kubernetes/app1.yaml
-      # Optionally push back to repo (if GitOps flow is required)
 
 # =========================
 # Options
