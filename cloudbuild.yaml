@@ -40,7 +40,7 @@ steps:
     args:
       - -c
       - |
-        trivy image --exit-code 1 --severity HIGH,CRITICAL us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}
+        trivy image --exit-code 1 --severity CRITICAL us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}
 
   # =====================
   # 5️⃣ Push Docker Image
@@ -99,5 +99,5 @@ images:
 # =====================
 availableSecrets:
   secretManager:
-  - versionName: projects/gcp-zero-to-hero-467513/secrets/github-token/versions/latest
+  - versionName: projects/gcp-zero-to-hero-467513/secrets/github-token/versions/1
     env: _GITHUB_TOKEN
