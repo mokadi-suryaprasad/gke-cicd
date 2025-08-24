@@ -1,5 +1,8 @@
+# cloudbuild.yaml
 steps:
-# 1. Install Python dependencies
+# =====================
+# 1️⃣ Install Python dependencies
+# =====================
 - name: 'python:3.11'
   entrypoint: 'bash'
   args:
@@ -8,24 +11,20 @@ steps:
       pip install --upgrade pip
       pip install -r app1/requirements.txt
 
-# 2. Run tests
+# =====================
+# 2️⃣ Run tests
+# =====================
 - name: 'python:3.11'
   entrypoint: 'bash'
   args:
     - -c
     - |
       echo "Running tests..."
-      # pytest app1/tests
+      pytest app1/tests
 
-# 3. Store artifacts in GCS (optional)
-- name: 'gcr.io/cloud-builders/gsutil'
-  args:
-    - cp
-    - -r
-    - app1/*
-    - gs://pythonapp1/
-
-# 4. Docker Build
+# =====================
+# 3️⃣ Build Docker Image
+# =====================
 - name: 'gcr.io/cloud-builders/docker'
   args:
     [
@@ -35,15 +34,19 @@ steps:
       './app1'
     ]
 
-# 5. Trivy Image Scan
+# =====================
+# 4️⃣ Trivy Image Scan (fail on HIGH/CRITICAL)
+# =====================
 - name: 'aquasec/trivy:latest'
   entrypoint: 'sh'
   args:
     - -c
     - |
-      trivy image --exit-code 0 --severity HIGH,CRITICAL us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}
+      trivy image --exit-code 1 --severity HIGH,CRITICAL us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}
 
-# 6. Push Docker Image
+# =====================
+# 5️⃣ Push Docker Image
+# =====================
 - name: 'gcr.io/cloud-builders/docker'
   args:
     [
@@ -51,24 +54,15 @@ steps:
       'us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}'
     ]
 
-# 7. Fetch GitHub PAT from Google Secret Manager
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'bash'
-  args:
-    - -c
-    - |
-      echo "Fetching GitHub PAT from Secret Manager..."
-      GITHUB_TOKEN=$(gcloud secrets versions access latest --secret=github-pat)
-      echo ${GITHUB_TOKEN} > /workspace/github_token.txt
-
-# 8. Update Kubernetes Manifest in GitHub
+# =====================
+# 6️⃣ Update Kubernetes manifests in GitHub
+# =====================
 - name: 'gcr.io/cloud-builders/git'
-  entrypoint: bash
+  entrypoint: 'bash'
+  secretEnv: ['_GITHUB_TOKEN']
   args:
     - -c
     - |
-      TOKEN=$(cat /workspace/github_token.txt)
-
       # Update deployment.yaml with new image
       sed -i "s|image: .*|image: us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}|" kubernetes/deployment.yaml
 
@@ -76,18 +70,17 @@ steps:
       git config --global user.email "mspr9773@gmail.com"
       git config --global user.name "M Surya Prasad"
 
-      # Authenticate GitHub with token
-      git remote set-url origin https://x-access-token:${TOKEN}@github.com/mokadi-suryaprasad/gke-cicd.git
+      # Authenticate GitHub with PAT from Secret Manager
+      git remote set-url origin https://x-access-token:${_GITHUB_TOKEN}@github.com/mokadi-suryaprasad/gcpk8srepo.git
 
       # Fetch and checkout main branch
       git fetch origin main
       git checkout main
 
       # Commit and push changes
-      git add kubernetes/deployment.yaml
-      git commit -m "Update image to ${SHORT_SHA}" || echo "No changes to commit"
+      git add kubernetes/deployment.yaml kubernetes/service.yaml README.md
+      git commit -m "Update Kubernetes manifests with new image ${SHORT_SHA}" || echo "No changes to commit"
       git push origin HEAD:main
-
 
 # =====================
 # Options
@@ -95,5 +88,15 @@ steps:
 options:
   logging: CLOUD_LOGGING_ONLY
 
+# =====================
+# Docker Images to Track
+# =====================
 images:
   - "us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}"
+
+# =====================
+# Secrets (GitHub PAT from GSM)
+# =====================
+secrets:
+- secretEnv:
+    _GITHUB_TOKEN: projects/230908579452/secrets/github-token/versions/latest
