@@ -1,4 +1,7 @@
+# =====================
 # cloudbuild.yaml
+# =====================
+
 steps:
   # =====================
   # 1️⃣ Install Python dependencies
@@ -59,7 +62,7 @@ steps:
   # =====================
   - name: 'gcr.io/cloud-builders/git'
     entrypoint: 'bash'
-    secretEnv: ['_GITHUB_TOKEN']
+    secretEnv: ['GH_TOKEN']
     args:
       - -c
       - |
@@ -71,7 +74,7 @@ steps:
         git config --global user.name "M Surya Prasad"
 
         # Authenticate GitHub with PAT from Secret Manager
-        git remote set-url origin https://x-access-token:${_GITHUB_TOKEN}@github.com/mokadi-suryaprasad/gcpk8srepo.git
+        git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/mokadi-suryaprasad/gcpk8srepo.git
 
         # Fetch and checkout main branch
         git fetch origin main
@@ -95,8 +98,8 @@ images:
   - "us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}"
 
 # =====================
-# Secrets (GitHub PAT from GSM)
+# Secrets (GitHub PAT from Secret Manager)
 # =====================
 secrets:
   - secretEnv:
-      _GITHUB_TOKEN: projects/230908579452/secrets/github-token/versions/1
+     GH_TOKEN: projects/230908579452/secrets/github-token/versions/1
