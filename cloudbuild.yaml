@@ -60,30 +60,6 @@ steps:
   # =====================
   # 6️⃣ Update Kubernetes manifests in GitHub
   # =====================
-  - name: 'gcr.io/cloud-builders/git'
-    entrypoint: 'bash'
-    secretEnv: ['GH_TOKEN']
-    args:
-      - -c
-      - |
-        # Update deployment.yaml with new image
-        sed -i "s|image: .*|image: us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}|" kubernetes/deployment.yaml
-
-        # Configure Git
-        git config --global user.email "mspr9773@gmail.com"
-        git config --global user.name "M Surya Prasad"
-
-        # Authenticate GitHub with PAT from Secret Manager
-        git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/mokadi-suryaprasad/gcpk8srepo.git
-
-        # Fetch and checkout main branch
-        git fetch origin main
-        git checkout main
-
-        # Commit and push changes
-        git add kubernetes/deployment.yaml kubernetes/service.yaml README.md
-        git commit -m "Update Kubernetes manifests with new image ${SHORT_SHA}" || echo "No changes to commit"
-        git push origin HEAD:main
 
 # =====================
 # Options
@@ -100,6 +76,3 @@ images:
 # =====================
 # Secrets (GitHub PAT from Secret Manager)
 # =====================
-secrets:
-  - secretEnv:
-     GH_TOKEN: projects/230908579452/secrets/github-token/versions/1
