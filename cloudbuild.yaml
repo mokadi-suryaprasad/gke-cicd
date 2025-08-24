@@ -99,4 +99,4 @@ images:
 # =====================
 secrets:
   - secretEnv:
-      _GITHUB_TOKEN: projects/230908579452/secrets/github-token/versions/latest
+      _GITHUB_TOKEN: projects/230908579452/secrets/github-token/versions/1
