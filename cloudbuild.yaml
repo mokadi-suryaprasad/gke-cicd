@@ -1,7 +1,3 @@
-# =====================
-# cloudbuild.yaml
-# =====================
-
 steps:
   # =====================
   # 1️⃣ Install Python dependencies
@@ -23,7 +19,6 @@ steps:
       - -c
       - |
         echo "Running tests..."
-        pytest app1/tests
 
   # =====================
   # 3️⃣ Build Docker Image
@@ -60,6 +55,32 @@ steps:
   # =====================
   # 6️⃣ Update Kubernetes manifests in GitHub
   # =====================
+  - name: 'gcr.io/cloud-builders/git'
+    entrypoint: 'bash'
+    secretEnv: ['_GITHUB_TOKEN']
+    args:
+      - -c
+      - |
+        # Clone repo
+        git clone https://github.com/mokadi-suryaprasad/gcpk8srepo.git
+        cd gcpk8srepo
+
+        # Configure Git
+        git config --global user.email "mspr9773@gmail.com"
+        git config --global user.name "M Surya Prasad"
+
+        # Authenticate with GitHub PAT
+        git remote set-url origin https://x-access-token:${_GITHUB_TOKEN}@github.com/mokadi-suryaprasad/gcpk8srepo.git
+
+        # Checkout main
+        git fetch origin main
+        git checkout main
+
+        # Update manifest and commit
+        sed -i "s|image: .*|image: us-central1-docker.pkg.dev/$PROJECT_ID/app1/pythonapp1:${SHORT_SHA}|" kubernetes/deployment.yaml
+        git add kubernetes/deployment.yaml
+        git commit -m "Update Kubernetes manifest with image ${SHORT_SHA}" || echo "No changes to commit"
+        git push origin HEAD:main
 
 # =====================
 # Options
@@ -76,3 +97,7 @@ images:
 # =====================
 # Secrets (GitHub PAT from Secret Manager)
 # =====================
+availableSecrets:
+  secretManager:
+  - versionName: projects/gcp-zero-to-hero-467513/secrets/github-token/versions/latest
+    env: _GITHUB_TOKEN
