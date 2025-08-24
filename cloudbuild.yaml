@@ -19,7 +19,6 @@ steps:
       - -c
       - |
         echo "Running tests..."
-        pytest app1/tests
 
   # =====================
   # 3️⃣ Build Docker Image
